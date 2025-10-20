@@ -1,0 +1,9 @@
+3
+1
+S -> Sa b
+2
+S -> Aa b
+A -> Ac Sd m
+2
+S -> Sa Ab
+A -> Ac Sc c
