@@ -1,0 +1,790 @@
+\section{Introducción al Proyecto}
+
+Este proyecto implementa un analizador sintáctico (parser) para gramáticas libres de contexto que puede determinar si una gramática es LL(1), SLR(1), ambas o ninguna. Además, una vez clasificada la gramática, el programa puede validar si cadenas de entrada son válidas según las reglas de la gramática.
+
+\subsection{¿Qué es una gramática libre de contexto?}
+
+Una gramática libre de contexto es un conjunto de reglas que nos permite generar cadenas de texto válidas. Imagina que son las reglas del juego para construir expresiones o sentencias válidas.
+
+Por ejemplo, una gramática simple podría ser:
+\begin{itemize}
+    \item \texttt{S $\rightarrow$ aS} (S puede convertirse en ``a'' seguido de otra S)
+    \item \texttt{S $\rightarrow$ b} (o S puede convertirse en ``b'')
+\end{itemize}
+
+Con estas reglas, podríamos generar cadenas como: \texttt{b}, \texttt{ab}, \texttt{aab}, \texttt{aaab}, etc.
+
+\subsection{Tipos de parsers implementados}
+
+\subsubsection{Parser LL(1)}
+\begin{itemize}
+    \item \textbf{L}: Lee la entrada de izquierda a derecha (Left-to-right)
+    \item \textbf{L}: Usa derivación por la izquierda (Leftmost derivation)
+    \item \textbf{1}: Usa un símbolo de lookahead
+\end{itemize}
+
+Es un parser \textit{top-down} (de arriba hacia abajo), como si fueras construyendo un árbol desde la raíz hacia las hojas.
+
+\subsubsection{Parser SLR(1)}
+\begin{itemize}
+    \item \textbf{S}: Simple
+    \item \textbf{L}: Lee de izquierda a derecha
+    \item \textbf{R}: Usa derivación por la derecha (Rightmost derivation)
+    \item \textbf{1}: Un símbolo de lookahead
+\end{itemize}
+
+Es un parser \textit{bottom-up} (de abajo hacia arriba), como si fueras armando las piezas desde las hojas hasta formar el árbol completo.
+
+\section{Arquitectura del Sistema}
+
+El proyecto está organizado en módulos que trabajan juntos como una cadena de producción. Vamos a ver cada uno paso a paso.
+
+\subsection{Flujo general del programa}
+
+\begin{enumerate}
+    \item El usuario proporciona una gramática
+    \item El programa la analiza y calcula información necesaria
+    \item Intenta construir parsers LL(1) y SLR(1)
+    \item Determina qué tipo de gramática es
+    \item Permite validar cadenas de entrada
+\end{enumerate}
+
+\subsection{Módulos principales}
+
+El código está dividido en módulos, cada uno con una responsabilidad específica:
+
+\begin{itemize}
+    \item \texttt{main.py}: Punto de entrada del programa
+    \item \texttt{cli.py}: Interfaz de línea de comandos
+    \item \texttt{utils.py}: Tipos de datos básicos (símbolos)
+    \item \texttt{grammar.py}: Representación de gramáticas
+    \item \texttt{first\_follow.py}: Cálculo de conjuntos FIRST y FOLLOW
+    \item \texttt{ll1.py}: Implementación del parser LL(1)
+    \item \texttt{slr1.py}: Implementación del parser SLR(1)
+\end{itemize}
+
+\section{Componentes Fundamentales}
+
+Antes de entender los parsers, necesitamos conocer los bloques básicos con los que trabaja el programa.
+
+\subsection{Símbolos (utils.py)}
+
+Un símbolo es la unidad básica en una gramática. Piensa en ellos como las piezas de Lego con las que construimos.
+
+\subsubsection{Tipos de símbolos}
+
+\begin{enumerate}
+    \item \textbf{Terminales}: Son símbolos que aparecen en el resultado final
+    \begin{itemize}
+        \item Se representan con letras minúsculas, dígitos o símbolos
+        \item Ejemplos: \texttt{a}, \texttt{b}, \texttt{+}, \texttt{*}, \texttt{(}, \texttt{)}
+    \end{itemize}
+
+    \item \textbf{No terminales}: Son símbolos que se pueden expandir usando reglas
+    \begin{itemize}
+        \item Se representan con letras MAYÚSCULAS
+        \item Ejemplos: \texttt{S}, \texttt{A}, \texttt{B}, \texttt{E}, \texttt{T}
+    \end{itemize}
+
+    \item \textbf{Epsilon ($\varepsilon$)}: Representa la cadena vacía
+    \begin{itemize}
+        \item En el código se representa con la letra \texttt{'e'}
+        \item Significa ``nada'' o ``cadena vacía''
+    \end{itemize}
+
+    \item \textbf{Marcador de fin (\$)}: Indica el final de la entrada
+    \begin{itemize}
+        \item Se usa para saber cuándo terminamos de leer
+    \end{itemize}
+\end{enumerate}
+
+\subsubsection{Implementación de Symbol}
+
+La clase \texttt{Symbol} identifica automáticamente el tipo de símbolo basándose en su carácter:
+
+\begin{itemize}
+    \item Si el carácter está entre 'A' y 'Z', es un no terminal
+    \item Si es 'e' con bandera especial, es epsilon
+    \item Si es '\$' con bandera especial, es marcador de fin
+    \item Todo lo demás es un terminal
+\end{itemize}
+
+\subsection{Producciones (grammar.py)}
+
+Una producción es una regla de la gramática. Tiene la forma: \texttt{A $\rightarrow$ $\alpha$}
+
+\begin{itemize}
+    \item \textbf{Lado izquierdo (lhs)}: Un no terminal (ej: \texttt{S})
+    \item \textbf{Lado derecho (rhs)}: Una secuencia de símbolos (ej: \texttt{a S b})
+\end{itemize}
+
+\textbf{Ejemplo}: La producción \texttt{S $\rightarrow$ aS} significa que el símbolo \texttt{S} puede reemplazarse por \texttt{a} seguido de \texttt{S}.
+
+\subsection{Gramática (grammar.py)}
+
+Una gramática completa consiste en:
+
+\begin{enumerate}
+    \item Un conjunto de \textbf{no terminales}
+    \item Un conjunto de \textbf{terminales}
+    \item Un conjunto de \textbf{producciones}
+    \item Un \textbf{símbolo inicial} (siempre es \texttt{S} en este proyecto)
+\end{enumerate}
+
+\subsubsection{Formato de entrada}
+
+El programa espera la gramática en un formato específico:
+
+\begin{verbatim}
+3
+S -> S+T T
+T -> T*F F
+F -> (S) i
+\end{verbatim}
+
+Donde:
+\begin{itemize}
+    \item Primera línea: número de líneas de producción (3)
+    \item Siguientes líneas: cada línea define producciones para un no terminal
+    \item Las alternativas se separan por espacios
+\end{itemize}
+
+En el ejemplo anterior:
+\begin{itemize}
+    \item \texttt{S} tiene dos producciones: \texttt{S $\rightarrow$ S+T} y \texttt{S $\rightarrow$ T}
+    \item \texttt{T} tiene dos producciones: \texttt{T $\rightarrow$ T*F} y \texttt{T $\rightarrow$ F}
+    \item \texttt{F} tiene dos producciones: \texttt{F $\rightarrow$ (S)} y \texttt{F $\rightarrow$ i}
+\end{itemize}
+
+\section{Conjuntos FIRST y FOLLOW}
+
+Antes de construir los parsers, necesitamos calcular dos conjuntos importantes que nos ayudan a tomar decisiones durante el análisis sintáctico.
+
+\subsection{Conjunto FIRST}
+
+\textbf{Definición}: \texttt{FIRST(X)} es el conjunto de terminales que pueden aparecer al inicio de una cadena derivada desde \texttt{X}.
+
+\subsubsection{¿Para qué sirve?}
+
+Imagina que estás leyendo una cadena y ves el símbolo \texttt{a}. El conjunto FIRST te dice qué producciones podrías usar basándote en ese primer símbolo.
+
+\subsubsection{Reglas de cálculo}
+
+\begin{enumerate}
+    \item Si \texttt{X} es un terminal, entonces \texttt{FIRST(X) = \{X\}}
+
+    \item Si \texttt{X} es un no terminal con producción \texttt{X $\rightarrow$ Y$_1$Y$_2$...Y$_n$}:
+    \begin{itemize}
+        \item Agrega \texttt{FIRST(Y$_1$) - \{$\varepsilon$\}} a \texttt{FIRST(X)}
+        \item Si \texttt{Y$_1$} puede derivar $\varepsilon$, agrega \texttt{FIRST(Y$_2$) - \{$\varepsilon$\}}
+        \item Continúa mientras los símbolos puedan derivar $\varepsilon$
+        \item Si todos los Y$_i$ pueden derivar $\varepsilon$, agrega $\varepsilon$ a \texttt{FIRST(X)}
+    \end{itemize}
+\end{enumerate}
+
+\subsubsection{Ejemplo}
+
+Para la gramática:
+\begin{verbatim}
+S -> aB | c
+B -> b | e
+\end{verbatim}
+
+Los conjuntos FIRST son:
+\begin{itemize}
+    \item \texttt{FIRST(S) = \{a, c\}} (S puede empezar con 'a' o con 'c')
+    \item \texttt{FIRST(B) = \{b, $\varepsilon$\}} (B puede empezar con 'b' o ser vacío)
+    \item \texttt{FIRST(a) = \{a\}}, \texttt{FIRST(b) = \{b\}}, \texttt{FIRST(c) = \{c\}}
+\end{itemize}
+
+\subsubsection{Implementación}
+
+El algoritmo usa \textbf{iteración de punto fijo}:
+
+\begin{enumerate}
+    \item Inicializa los conjuntos FIRST para todos los símbolos
+    \item Repite hasta que no haya cambios:
+    \begin{itemize}
+        \item Para cada producción, calcula el FIRST del lado derecho
+        \item Agrégalo al FIRST del lado izquierdo
+    \end{itemize}
+\end{enumerate}
+
+\subsection{Conjunto FOLLOW}
+
+\textbf{Definición}: \texttt{FOLLOW(A)} es el conjunto de terminales que pueden aparecer inmediatamente después de \texttt{A} en alguna derivación.
+
+\subsubsection{¿Para qué sirve?}
+
+Si el parser está procesando un no terminal \texttt{A} y necesita decidir qué hacer, mira el siguiente símbolo de entrada. Si ese símbolo está en \texttt{FOLLOW(A)}, el parser puede reducir (terminar de procesar \texttt{A}).
+
+\subsubsection{Reglas de cálculo}
+
+\begin{enumerate}
+    \item \texttt{FOLLOW(S)} contiene \$ (el símbolo inicial siempre puede estar seguido por fin de entrada)
+
+    \item Para cada producción \texttt{A $\rightarrow$ $\alpha$B$\beta$}:
+    \begin{itemize}
+        \item Agrega \texttt{FIRST($\beta$) - \{$\varepsilon$\}} a \texttt{FOLLOW(B)}
+        \item Si $\beta$ puede derivar $\varepsilon$ (o está vacío), agrega \texttt{FOLLOW(A)} a \texttt{FOLLOW(B)}
+    \end{itemize}
+\end{enumerate}
+
+\subsubsection{Ejemplo}
+
+Para la gramática:
+\begin{verbatim}
+S -> AB
+A -> a
+B -> b
+\end{verbatim}
+
+Los conjuntos FOLLOW son:
+\begin{itemize}
+    \item \texttt{FOLLOW(S) = \{\$\}} (S es el inicio, puede terminar la entrada)
+    \item \texttt{FOLLOW(A) = \{b\}} (A está seguido por B, y B puede empezar con 'b')
+    \item \texttt{FOLLOW(B) = \{\$\}} (B está al final, hereda FOLLOW de S)
+\end{itemize}
+
+\subsubsection{Implementación}
+
+Similar al cálculo de FIRST, usa iteración de punto fijo:
+
+\begin{enumerate}
+    \item Inicializa todos los FOLLOW como vacíos
+    \item Agrega \$ a FOLLOW del símbolo inicial
+    \item Repite hasta que no haya cambios:
+    \begin{itemize}
+        \item Para cada producción y cada posición en el lado derecho
+        \item Si encuentra un no terminal, actualiza su FOLLOW según las reglas
+    \end{itemize}
+\end{enumerate}
+
+\section{Parser LL(1)}
+
+El parser LL(1) es un analizador sintáctico \textit{predictivo} que trabaja de arriba hacia abajo.
+
+\subsection{Idea principal}
+
+El parser usa una \textbf{pila} y una \textbf{tabla de análisis sintáctico} para decidir qué producciones aplicar.
+
+\begin{itemize}
+    \item \textbf{Pila}: Almacena símbolos que esperamos procesar
+    \item \textbf{Tabla M[A, a]}: Para no terminal \texttt{A} y terminal \texttt{a}, indica qué producción usar
+    \item \textbf{Lookahead}: Miramos un símbolo adelante para decidir
+\end{itemize}
+
+\subsection{Construcción de la tabla LL(1)}
+
+La tabla se construye usando los conjuntos FIRST y FOLLOW:
+
+\textbf{Para cada producción} \texttt{A $\rightarrow$ $\alpha$}:
+
+\begin{enumerate}
+    \item Para cada terminal \texttt{a} en \texttt{FIRST($\alpha$)}:
+    \begin{itemize}
+        \item Agrega la producción \texttt{A $\rightarrow$ $\alpha$} a \texttt{M[A, a]}
+    \end{itemize}
+
+    \item Si $\varepsilon$ está en \texttt{FIRST($\alpha$)}:
+    \begin{itemize}
+        \item Para cada terminal \texttt{b} en \texttt{FOLLOW(A)}
+        \item Agrega la producción \texttt{A $\rightarrow$ $\alpha$} a \texttt{M[A, b]}
+    \end{itemize}
+\end{enumerate}
+
+\subsection{Conflictos en LL(1)}
+
+Una gramática \textbf{NO es LL(1)} si:
+\begin{itemize}
+    \item Una celda \texttt{M[A, a]} tiene más de una producción
+    \item Esto se llama un \textbf{conflicto}
+\end{itemize}
+
+\textbf{Ejemplo de conflicto}:
+\begin{verbatim}
+S -> aS | aB
+\end{verbatim}
+
+Ambas producciones empiezan con 'a', así que \texttt{M[S, a]} tendría dos entradas. El parser no sabría cuál elegir.
+
+\subsection{Algoritmo de parsing LL(1)}
+
+\begin{enumerate}
+    \item \textbf{Inicialización}:
+    \begin{itemize}
+        \item Pila = \texttt{[\$, S]} (símbolo de fin y símbolo inicial)
+        \item Entrada = cadena + \texttt{\$}
+    \end{itemize}
+
+    \item \textbf{Bucle principal}:
+    \begin{itemize}
+        \item \texttt{top} = tope de la pila
+        \item \texttt{current} = símbolo actual de entrada
+    \end{itemize}
+
+    \item \textbf{Casos}:
+    \begin{enumerate}
+        \item Si \texttt{top == current}:
+        \begin{itemize}
+            \item Sacar de la pila
+            \item Avanzar en la entrada
+        \end{itemize}
+
+        \item Si \texttt{top} es no terminal:
+        \begin{itemize}
+            \item Buscar \texttt{M[top, current]}
+            \item Si no existe: \textbf{rechazar}
+            \item Si existe: sacar top, poner símbolos del lado derecho (en orden inverso)
+        \end{itemize}
+
+        \item Si \texttt{top} es terminal pero \texttt{top $\neq$ current}:
+        \begin{itemize}
+            \item \textbf{Rechazar}
+        \end{itemize}
+    \end{enumerate}
+
+    \item \textbf{Aceptación}:
+    \begin{itemize}
+        \item Aceptar si pila = \texttt{[\$]} y entrada = \texttt{[\$]}
+    \end{itemize}
+\end{enumerate}
+
+\subsection{Ejemplo de parsing LL(1)}
+
+Gramática:
+\begin{verbatim}
+S -> aS | b
+\end{verbatim}
+
+Cadena de entrada: \texttt{aab}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{|l|l|l|l|}
+\hline
+\textbf{Paso} & \textbf{Pila} & \textbf{Entrada} & \textbf{Acción} \\
+\hline
+1 & \texttt{[\$, S]} & \texttt{aab\$} & M[S,a] = S$\rightarrow$aS \\
+2 & \texttt{[\$, a, S]} & \texttt{aab\$} & Coincidir a \\
+3 & \texttt{[\$, S]} & \texttt{ab\$} & M[S,a] = S$\rightarrow$aS \\
+4 & \texttt{[\$, a, S]} & \texttt{ab\$} & Coincidir a \\
+5 & \texttt{[\$, S]} & \texttt{b\$} & M[S,b] = S$\rightarrow$b \\
+6 & \texttt{[\$, b]} & \texttt{b\$} & Coincidir b \\
+7 & \texttt{[\$]} & \texttt{\$} & \textbf{Aceptar} \\
+\hline
+\end{tabular}
+\caption{Traza de ejecución del parser LL(1)}
+\end{table}
+
+\section{Parser SLR(1)}
+
+El parser SLR(1) es un analizador sintáctico de tipo \textit{shift-reduce} que trabaja de abajo hacia arriba.
+
+\subsection{Idea principal}
+
+En lugar de predecir qué producción usar, el parser SLR(1):
+\begin{itemize}
+    \item Lee símbolos de entrada y los acumula (shift)
+    \item Cuando reconoce el lado derecho de una producción, lo reduce al lado izquierdo (reduce)
+    \item Usa un \textbf{autómata LR(0)} para guiar las decisiones
+\end{itemize}
+
+\subsection{Items LR(0)}
+
+Un \textbf{item LR(0)} es una producción con un punto ($\bullet$) que indica el progreso del parsing.
+
+\textbf{Ejemplos}:
+\begin{itemize}
+    \item \texttt{[S $\rightarrow$ $\bullet$ aS]} - No hemos visto nada aún
+    \item \texttt{[S $\rightarrow$ a $\bullet$ S]} - Ya vimos 'a', esperamos ver S
+    \item \texttt{[S $\rightarrow$ aS $\bullet$]} - Vimos todo, listos para reducir
+\end{itemize}
+
+\subsection{Construcción del autómata LR(0)}
+
+\subsubsection{Operación CLOSURE}
+
+Dado un conjunto de items, \texttt{CLOSURE} agrega items relacionados.
+
+\textbf{Regla}: Si tenemos \texttt{[A $\rightarrow$ $\alpha$ $\bullet$ B $\beta$]}, donde B es no terminal, agregamos todos los items \texttt{[B $\rightarrow$ $\bullet$ $\gamma$]} para cada producción de B.
+
+\textbf{Ejemplo}:
+\begin{verbatim}
+CLOSURE({[S -> • AB]}) = {
+    [S -> • AB],
+    [A -> • a],    (porque A está después del punto)
+    [A -> • e]
+}
+\end{verbatim}
+
+\subsubsection{Operación GOTO}
+
+\texttt{GOTO(I, X)} nos dice a qué estado vamos si vemos el símbolo X estando en el estado I.
+
+\textbf{Proceso}:
+\begin{enumerate}
+    \item Toma todos los items con X después del punto
+    \item Mueve el punto sobre X
+    \item Calcula el CLOSURE del resultado
+\end{enumerate}
+
+\textbf{Ejemplo}:
+\begin{verbatim}
+I_0 = {[S -> • aB], [S -> • c]}
+GOTO(I_0, a) = CLOSURE({[S -> a • B]})
+             = {[S -> a • B], [B -> • b], [B -> • e]}
+\end{verbatim}
+
+\subsubsection{Construcción del autómata}
+
+\begin{enumerate}
+    \item \textbf{Estado inicial}:
+    \begin{itemize}
+        \item Crear gramática aumentada: \texttt{S' $\rightarrow$ S}
+        \item Estado inicial = \texttt{CLOSURE(\{[S' $\rightarrow$ $\bullet$ S]\})}
+    \end{itemize}
+
+    \item \textbf{Generar estados}:
+    \begin{itemize}
+        \item Para cada estado y cada símbolo posible
+        \item Calcular \texttt{GOTO(estado, símbolo)}
+        \item Si el resultado es un estado nuevo, agregarlo
+        \item Marcar la transición
+    \end{itemize}
+
+    \item \textbf{Repetir} hasta que no haya estados nuevos
+\end{enumerate}
+
+\subsection{Tablas ACTION y GOTO}
+
+El parser SLR(1) usa dos tablas:
+
+\subsubsection{Tabla ACTION}
+
+Para el estado \texttt{i} y terminal \texttt{a}, indica la acción:
+
+\begin{enumerate}
+    \item \textbf{Shift j}: Mover el símbolo a la pila, ir al estado j
+    \item \textbf{Reduce A$\rightarrow$$\alpha$}: Reducir usando la producción A$\rightarrow$$\alpha$
+    \item \textbf{Accept}: La entrada es válida
+    \item \textbf{Error}: La entrada no es válida
+\end{enumerate}
+
+\textbf{Reglas de construcción}:
+\begin{itemize}
+    \item Si \texttt{[A $\rightarrow$ $\alpha$ $\bullet$ a $\beta$]} está en estado i y \texttt{GOTO(i, a) = j}:
+    \begin{itemize}
+        \item \texttt{ACTION[i, a] = shift j}
+    \end{itemize}
+
+    \item Si \texttt{[A $\rightarrow$ $\alpha$ $\bullet$]} está en estado i:
+    \begin{itemize}
+        \item Para cada \texttt{a} en \texttt{FOLLOW(A)}
+        \item \texttt{ACTION[i, a] = reduce A$\rightarrow$$\alpha$}
+    \end{itemize}
+
+    \item Si \texttt{[S' $\rightarrow$ S $\bullet$]} está en estado i:
+    \begin{itemize}
+        \item \texttt{ACTION[i, \$] = accept}
+    \end{itemize}
+\end{itemize}
+
+\subsubsection{Tabla GOTO}
+
+Para estado \texttt{i} y no terminal \texttt{A}:
+\begin{itemize}
+    \item Si \texttt{GOTO(i, A) = j}, entonces \texttt{GOTO[i, A] = j}
+\end{itemize}
+
+\subsection{Conflictos en SLR(1)}
+
+Una gramática \textbf{NO es SLR(1)} si hay conflictos:
+
+\begin{enumerate}
+    \item \textbf{Shift/Reduce}: Una celda tiene shift y reduce
+    \item \textbf{Reduce/Reduce}: Una celda tiene dos reduces diferentes
+\end{enumerate}
+
+\subsection{Algoritmo de parsing SLR(1)}
+
+\begin{enumerate}
+    \item \textbf{Inicialización}:
+    \begin{itemize}
+        \item Pila de estados = \texttt{[0]}
+        \item Pila de símbolos = \texttt{[]}
+        \item Entrada = cadena + \texttt{\$}
+    \end{itemize}
+
+    \item \textbf{Bucle principal}:
+    \begin{itemize}
+        \item \texttt{estado} = tope de pila de estados
+        \item \texttt{símbolo} = símbolo actual de entrada
+        \item \texttt{acción} = \texttt{ACTION[estado, símbolo]}
+    \end{itemize}
+
+    \item \textbf{Ejecutar acción}:
+    \begin{enumerate}
+        \item \textbf{Shift j}:
+        \begin{itemize}
+            \item Poner símbolo en pila de símbolos
+            \item Poner j en pila de estados
+            \item Avanzar entrada
+        \end{itemize}
+
+        \item \textbf{Reduce A$\rightarrow$$\alpha$}:
+        \begin{itemize}
+            \item Sacar $|\alpha|$ símbolos y estados
+            \item Poner A en pila de símbolos
+            \item \texttt{nuevo\_estado} = \texttt{GOTO[tope\_estados, A]}
+            \item Poner nuevo\_estado en pila de estados
+        \end{itemize}
+
+        \item \textbf{Accept}: \textbf{Aceptar cadena}
+
+        \item \textbf{Error}: \textbf{Rechazar cadena}
+    \end{enumerate}
+\end{enumerate}
+
+\subsection{Ejemplo de parsing SLR(1)}
+
+Gramática:
+\begin{verbatim}
+S -> AB
+A -> a
+B -> b
+\end{verbatim}
+
+Cadena: \texttt{ab}
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{|l|l|l|l|l|}
+\hline
+\textbf{Paso} & \textbf{Pila Estados} & \textbf{Pila Símbolos} & \textbf{Entrada} & \textbf{Acción} \\
+\hline
+1 & \texttt{[0]} & \texttt{[]} & \texttt{ab\$} & shift 2 \\
+2 & \texttt{[0,2]} & \texttt{[a]} & \texttt{b\$} & reduce A$\rightarrow$a \\
+3 & \texttt{[0,3]} & \texttt{[A]} & \texttt{b\$} & shift 4 \\
+4 & \texttt{[0,3,4]} & \texttt{[A,b]} & \texttt{\$} & reduce B$\rightarrow$b \\
+5 & \texttt{[0,3,5]} & \texttt{[A,B]} & \texttt{\$} & reduce S$\rightarrow$AB \\
+6 & \texttt{[0,1]} & \texttt{[S]} & \texttt{\$} & \textbf{accept} \\
+\hline
+\end{tabular}
+\caption{Traza de ejecución del parser SLR(1)}
+\end{table}
+
+\section{Flujo de Ejecución del Programa}
+
+Ahora que entendemos todos los componentes, veamos cómo trabajan juntos.
+
+\subsection{Punto de entrada (main.py)}
+
+El archivo \texttt{main.py} es muy simple:
+
+\begin{enumerate}
+    \item Configura el path para importar los módulos
+    \item Llama a la función \texttt{run()} de \texttt{cli.py}
+\end{enumerate}
+
+\subsection{Interfaz de línea de comandos (cli.py)}
+
+La función \texttt{run()} ejecuta el flujo principal:
+
+\subsubsection{Paso 1: Leer la gramática}
+
+\begin{itemize}
+    \item Lee de la entrada estándar
+    \item Espera el formato: primera línea = número de producciones, luego las producciones
+    \item Llama a \texttt{parse\_grammar()} para convertir el texto en un objeto Grammar
+\end{itemize}
+
+\subsubsection{Paso 2: Calcular conjuntos FIRST y FOLLOW}
+
+\begin{itemize}
+    \item \texttt{first\_sets = compute\_first\_sets(grammar)}
+    \item \texttt{follow\_sets = compute\_follow\_sets(grammar, first\_sets)}
+    \item Estos conjuntos se usarán para construir los parsers
+\end{itemize}
+
+\subsubsection{Paso 3: Intentar construir parser LL(1)}
+
+\begin{verbatim}
+try:
+    ll1_parser = LL1Parser(grammar, first_sets, follow_sets)
+except NotLL1Exception:
+    ll1_parser = None
+\end{verbatim}
+
+\begin{itemize}
+    \item Si se construye exitosamente: la gramática es LL(1)
+    \item Si lanza excepción: la gramática NO es LL(1)
+\end{itemize}
+
+\subsubsection{Paso 4: Intentar construir parser SLR(1)}
+
+\begin{verbatim}
+try:
+    slr1_parser = SLR1Parser(grammar, first_sets, follow_sets)
+except NotSLR1Exception:
+    slr1_parser = None
+\end{verbatim}
+
+Similar al paso anterior pero para SLR(1).
+
+\subsubsection{Paso 5: Clasificar y actuar}
+
+Hay 4 casos posibles:
+
+\begin{enumerate}
+    \item \textbf{Ambos parsers exitosos} (LL(1) Y SLR(1)):
+    \begin{itemize}
+        \item Entrar en modo interactivo
+        \item El usuario elige qué parser usar:
+        \begin{itemize}
+            \item \texttt{T} o \texttt{t}: Usar LL(1)
+            \item \texttt{B} o \texttt{b}: Usar SLR(1)
+            \item \texttt{Q} o \texttt{q}: Salir
+        \end{itemize}
+        \item Leer cadenas y validarlas con el parser elegido
+    \end{itemize}
+
+    \item \textbf{Solo LL(1)}:
+    \begin{itemize}
+        \item Imprimir: ``Grammar is LL(1).''
+        \item Leer cadenas y validarlas con el parser LL(1)
+    \end{itemize}
+
+    \item \textbf{Solo SLR(1)}:
+    \begin{itemize}
+        \item Imprimir: ``Grammar is SLR(1).''
+        \item Leer cadenas y validarlas con el parser SLR(1)
+    \end{itemize}
+
+    \item \textbf{Ninguno}:
+    \begin{itemize}
+        \item Imprimir: ``Grammar is neither LL(1) nor SLR(1).''
+        \item Terminar el programa
+    \end{itemize}
+\end{enumerate}
+
+\subsubsection{Paso 6: Validar cadenas}
+
+La función \texttt{parse\_strings\_until\_empty()} lee cadenas hasta encontrar una línea vacía:
+
+\begin{itemize}
+    \item Para cada cadena, llama a \texttt{parser.parse(cadena)}
+    \item Si retorna \texttt{True}: imprime ``yes''
+    \item Si retorna \texttt{False}: imprime ``no''
+\end{itemize}
+
+\section{Ejemplos Completos}
+
+Veamos ejemplos reales de cómo funciona el programa.
+
+\subsection{Ejemplo 1: Gramática solo SLR(1)}
+
+\textbf{Entrada}:
+\begin{verbatim}
+3
+S -> S+T T
+T -> T*F F
+F -> (S) i
+i+i
+(i)
+(i+i)*i)
+
+\end{verbatim}
+
+\textbf{Proceso}:
+
+\begin{enumerate}
+    \item Parser lee la gramática (expresiones aritméticas)
+    \item Calcula FIRST y FOLLOW
+    \item Intenta LL(1): \textbf{Falla} (tiene recursión izquierda)
+    \item Intenta SLR(1): \textbf{Éxito}
+    \item Imprime: ``Grammar is SLR(1).''
+    \item Procesa las cadenas:
+    \begin{itemize}
+        \item \texttt{i+i}: yes (válida)
+        \item \texttt{(i)}: yes (válida)
+        \item \texttt{(i+i)*i)}: no (paréntesis mal balanceados)
+    \end{itemize}
+\end{enumerate}
+
+\subsection{Ejemplo 2: Gramática ambos tipos}
+
+\textbf{Entrada}:
+\begin{verbatim}
+3
+S -> AB
+A -> aA d
+B -> bBc e
+T
+d
+adbc
+a
+
+Q
+\end{verbatim}
+
+\textbf{Proceso}:
+
+\begin{enumerate}
+    \item Parser lee la gramática
+    \item Calcula FIRST y FOLLOW
+    \item Intenta LL(1): \textbf{Éxito}
+    \item Intenta SLR(1): \textbf{Éxito}
+    \item Entra en modo interactivo
+    \item Usuario presiona \texttt{T} (elegir LL(1))
+    \item Procesa cadenas con LL(1):
+    \begin{itemize}
+        \item \texttt{d}: yes
+        \item \texttt{adbc}: yes
+        \item \texttt{a}: no
+    \end{itemize}
+    \item Usuario presiona \texttt{Q} (salir)
+\end{enumerate}
+
+\section{Consideraciones de Implementación}
+
+\subsection{Eficiencia}
+
+\begin{itemize}
+    \item \textbf{Conjuntos FIRST/FOLLOW}: Iteración de punto fijo puede requerir múltiples pasadas
+    \item \textbf{Autómata LR(0)}: En el peor caso, número de estados exponencial
+    \item \textbf{Parsing}: Ambos parsers son lineales en el tamaño de la entrada
+\end{itemize}
+
+\subsection{Manejo de errores}
+
+\begin{itemize}
+    \item \textbf{Gramática inválida}: Se captura con \texttt{ValueError}
+    \item \textbf{Conflictos LL(1)}: Se lanza \texttt{NotLL1Exception}
+    \item \textbf{Conflictos SLR(1)}: Se lanza \texttt{NotSLR1Exception}
+    \item \textbf{Entrada malformada}: Se valida y rechaza apropiadamente
+\end{itemize}
+
+\subsection{Estructuras de datos}
+
+\begin{itemize}
+    \item \textbf{Símbolos}: Hashables para usar en conjuntos y diccionarios
+    \item \textbf{Items LR(0)}: También hashables para el autómata
+    \item \textbf{Estados}: Conjuntos congelados (frozenset) para inmutabilidad
+    \item \textbf{Tablas}: Diccionarios con tuplas como claves
+\end{itemize}
+
+\section{Resumen}
+
+Este proyecto implementa un sistema completo de análisis sintáctico que:
+
+\begin{enumerate}
+    \item \textbf{Lee} gramáticas libres de contexto en formato texto
+    \item \textbf{Calcula} conjuntos FIRST y FOLLOW necesarios para el análisis
+    \item \textbf{Construye} parsers LL(1) (top-down) y SLR(1) (bottom-up)
+    \item \textbf{Clasifica} automáticamente la gramática
+    \item \textbf{Valida} cadenas de entrada según las reglas de la gramática
+\end{enumerate}
+
+La arquitectura modular permite entender cada componente de forma independiente, mientras que el flujo de ejecución muestra cómo se integran para resolver el problema completo del análisis sintáctico.
