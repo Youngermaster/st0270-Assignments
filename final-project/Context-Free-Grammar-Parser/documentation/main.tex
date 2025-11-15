@@ -1,0 +1,21 @@
+\documentclass[a4paper, table]{article}
+\input{General/Preamble} % Loads in the preamble 
+\input{General/Settings} % Loads in user defined settings
+\usepackage{hyperref}
+\begin{document}
+
+% Inserts the front page
+\input{Chapters/0. Frontpage}\pagenumbering{arabic}
+\newpage
+
+% Generates a ToC without page number
+{\hypersetup{linkcolor=black} % Keeps the ToC black even with non-black linkcolor
+\tableofcontents\thispagestyle{empty}}
+\newpage
+
+\input{Chapters/2. Documentation.tex}
+\newpage
+\bibliographystyle{plainurl} % estilo básico con URLs clickeables
+\bibliography{General/References}
+
+\end{document}
