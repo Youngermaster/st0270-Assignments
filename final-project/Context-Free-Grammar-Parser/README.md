@@ -160,6 +160,18 @@ This feature makes it easy to toggle between:
 - **Production mode** (`DEBUG = False`): Clean output for automated testing and grading
 - **Learning mode** (`DEBUG = True`): Detailed output for understanding parser internals
 
+**Quick toggle guide:**
+
+```python
+# In src/cli.py (line ~23)
+
+# For learning/debugging - shows all tables and states
+DEBUG = True
+
+# For clean output - only shows parsing results
+DEBUG = False
+```
+
 ## Input Format
 
 ```
