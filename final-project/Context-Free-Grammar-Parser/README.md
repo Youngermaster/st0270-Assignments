@@ -4,7 +4,9 @@ A clean, modular Python implementation of LL(1) and SLR(1) parsers for context-f
 
 ## Author
 
-Juan Manuel Young Hoyos
+- [Juan Manuel Young Hoyos](https://github.com/Youngermaster)
+- Jean Carlo Ardila Acevedo
+- Andrés Restrepo Giraldo
 
 ## Project Overview
 
@@ -417,43 +419,8 @@ LL(1) conflicts occur when:
 SLR(1) conflicts occur when:
 - Shift/reduce or reduce/reduce conflicts in ACTION table
 
-### Import errors
-
-Run from the `python/` directory:
-```bash
-cd python
-python main.py
-```
-
 ## Learning Resources
 
 This implementation follows concepts from:
 - **"Compilers: Principles, Techniques, and Tools"** (Dragon Book) by Aho, Lam, Sethi, and Ullman
 - **Formal Languages and Automata Theory** courses (ST0270/SI2002)
-
-## Comparison with OCaml Implementation
-
-| Aspect | Python | OCaml |
-|--------|--------|-------|
-| Type Safety | Runtime (duck typing) | Compile-time (strong static) |
-| Paradigm | Multi-paradigm | Functional-first |
-| Verbosity | More explicit | More concise |
-| Beginner-friendly | ✓✓✓ Very accessible | ✓✓ Requires FP knowledge |
-| Performance | Interpreted | Compiled to native |
-| Best for | Learning, prototyping | Production, correctness |
-
-## Contributing
-
-This is an educational project. Feel free to:
-- Add more examples
-- Improve documentation
-- Add unit tests
-- Optimize algorithms
-
-## License
-
-MIT License - See LICENSE file for details.
-
----
-
-**Happy Parsing!** If you have questions about the code, check the inline comments and docstrings - they explain every step in detail.
