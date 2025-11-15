@@ -109,6 +109,57 @@ i+i
 EOF
 ```
 
+### Debug Mode
+
+The application includes a **DEBUG mode** that displays detailed parser information including parsing tables, automaton states, and transitions. This is useful for:
+- Learning how LL(1) and SLR(1) parsers work internally
+- Debugging grammar issues
+- Understanding parser construction
+- Educational purposes in compiler courses
+
+**To enable/disable DEBUG mode:**
+
+1. Open `src/cli.py`
+2. Find the DEBUG flag at the top of the file (around line 23):
+   ```python
+   DEBUG = True  # Change to False to disable debug output
+   ```
+3. Set `DEBUG = True` to enable detailed output
+4. Set `DEBUG = False` for clean, minimal output
+
+**What DEBUG mode shows:**
+
+When `DEBUG = True`:
+- **LL(1) Parser**: Displays the complete parsing table M[A,a]
+- **SLR(1) Parser**: Shows:
+  - All LR(0) automaton states with items
+  - Complete ACTION table (shift/reduce/accept actions)
+  - Complete GOTO table (state transitions)
+
+**Example output with DEBUG = True:**
+
+```
+Grammar is LL(1).
+
+--- LL(1) Parsing Table ---
+M[S, a] = S -> aB
+M[S, d] = S -> d
+M[B, b] = B -> bBc
+M[B, e] = B -> e
+---------------------------
+Enter strings to parse:
+```
+
+**Example output with DEBUG = False:**
+
+```
+Grammar is LL(1).
+```
+
+This feature makes it easy to toggle between:
+- **Production mode** (`DEBUG = False`): Clean output for automated testing and grading
+- **Learning mode** (`DEBUG = True`): Detailed output for understanding parser internals
+
 ## Input Format
 
 ```

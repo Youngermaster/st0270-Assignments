@@ -15,6 +15,14 @@ from .first_follow import compute_first_sets, compute_follow_sets
 from .ll1 import LL1Parser, NotLL1Exception
 from .slr1 import SLR1Parser, NotSLR1Exception
 
+# ============================================================================
+# DEBUG MODE CONFIGURATION
+# ============================================================================
+# Set to True to enable detailed parser output (tables, states, automaton)
+# Set to False for clean, minimal output
+DEBUG = True  # Change to False to disable debug output
+# ============================================================================
+
 
 def read_grammar_input():
     """
@@ -104,10 +112,21 @@ def interactive_mode(ll1_parser: LL1Parser, slr1_parser: SLR1Parser):
 
             elif choice in ['T', 't']:
                 # Use LL(1) parser
+                if DEBUG:
+                    print("\n--- LL(1) Parsing Table ---")
+                    ll1_parser.print_table()
+                    print("---------------------------")
+                    print("Enter strings to parse with LL(1) (empty line to return):")
                 parse_strings_until_empty(ll1_parser.parse)
 
             elif choice in ['B', 'b']:
                 # Use SLR(1) parser
+                if DEBUG:
+                    print("\n--- SLR(1) Automaton States and Tables ---")
+                    slr1_parser.print_states()
+                    slr1_parser.print_tables()
+                    print("------------------------------------------")
+                    print("Enter strings to parse with SLR(1) (empty line to return):")
                 parse_strings_until_empty(slr1_parser.parse)
 
             else:
@@ -164,11 +183,26 @@ def run():
         elif ll1_parser:
             # Case 2: LL(1) only
             print("Grammar is LL(1).")
+
+            if DEBUG:
+                print("\n--- LL(1) Parsing Table ---")
+                ll1_parser.print_table()
+                print("---------------------------")
+                print("Enter strings to parse:")
+
             parse_strings_until_empty(ll1_parser.parse)
 
         elif slr1_parser:
             # Case 3: SLR(1) only
             print("Grammar is SLR(1).")
+
+            if DEBUG:
+                print("\n--- SLR(1) Automaton States and Tables ---")
+                slr1_parser.print_states()
+                slr1_parser.print_tables()
+                print("------------------------------------------")
+                print("Enter strings to parse:")
+
             parse_strings_until_empty(slr1_parser.parse)
 
         else:
