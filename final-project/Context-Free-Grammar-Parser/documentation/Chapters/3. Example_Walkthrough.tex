@@ -1,0 +1,931 @@
+\section{Ejemplo Paso a Paso: Walkthrough Completo}
+
+En esta sección vamos a seguir la ejecución del programa con un ejemplo concreto, como si estuviéramos haciendo debugging. Veremos exactamente qué pasa en cada paso del código.
+
+\subsection{Ejemplo Seleccionado}
+
+Vamos a usar esta gramática simple:
+
+\begin{verbatim}
+3
+S -> AB
+A -> aA d
+B -> bBc e
+\end{verbatim}
+
+Y vamos a validar la cadena: \texttt{adbc}
+
+\subsection{Paso 1: Lectura de la Entrada (cli.py)}
+
+\subsubsection{Función read\_grammar\_input()}
+
+El programa comienza leyendo la entrada estándar línea por línea:
+
+\begin{verbatim}
+def read_grammar_input():
+    lines = []
+    first_line = input().strip()  # Lee "3"
+    lines.append(first_line)
+    n = int(first_line)            # n = 3
+
+    for _ in range(n):             # Lee 3 líneas
+        line = input()
+        lines.append(line)
+\end{verbatim}
+
+\textbf{Estado después de este paso:}
+\begin{verbatim}
+lines = [
+    "3",
+    "S -> AB",
+    "A -> aA d",
+    "B -> bBc e"
+]
+\end{verbatim}
+
+\subsection{Paso 2: Parseo de la Gramática (grammar.py)}
+
+\subsubsection{Función parse\_grammar(lines)}
+
+Ahora el programa convierte el texto en objetos Python:
+
+\begin{enumerate}
+    \item \textbf{Lee el número de producciones:}
+    \begin{verbatim}
+    n_str = lines[0].strip()  # "3"
+    n = int(n_str)             # 3
+    \end{verbatim}
+
+    \item \textbf{Procesa cada línea de producción:}
+
+    \textbf{Línea 1: ``S -> AB''}
+    \begin{verbatim}
+    def parse_production_line("S -> AB"):
+        parts = "S -> AB".split(" -> ")
+        # parts = ["S", "AB"]
+
+        lhs_str = "S"
+        rhs_str = "AB"
+
+        lhs = char_to_symbol('S')  # Symbol('S', nonterminal)
+
+        alternatives = "AB".split()  # ["AB"]
+
+        # Para "AB":
+        rhs = string_to_symbols("AB")
+        # rhs = [Symbol('A'), Symbol('B')]
+
+        return [Production(S, [A, B])]
+    \end{verbatim}
+
+    \textbf{Línea 2: ``A -> aA d''}
+    \begin{verbatim}
+    alternatives = "aA d".split()  # ["aA", "d"]
+
+    # Producción 1: A -> aA
+    rhs = [Symbol('a', terminal), Symbol('A', nonterminal)]
+
+    # Producción 2: A -> d
+    rhs = [Symbol('d', terminal)]
+    \end{verbatim}
+
+    \textbf{Línea 3: ``B -> bBc e''}
+    \begin{verbatim}
+    alternatives = "bBc e".split()  # ["bBc", "e"]
+
+    # Producción 1: B -> bBc
+    rhs = [Symbol('b'), Symbol('B'), Symbol('c')]
+
+    # Producción 2: B -> e (epsilon)
+    rhs = [Symbol('e', is_epsilon=True)]
+    \end{verbatim}
+\end{enumerate}
+
+\textbf{Estado después de este paso:}
+
+\begin{verbatim}
+Grammar:
+  productions = [
+    S -> AB,
+    A -> aA,
+    A -> d,
+    B -> bBc,
+    B -> e (epsilon)
+  ]
+
+  nonterminals = {S, A, B}
+  terminals = {a, b, c, d}
+  start_symbol = S
+
+  production_map = {
+    S: [S -> AB],
+    A: [A -> aA, A -> d],
+    B: [B -> bBc, B -> e]
+  }
+\end{verbatim}
+
+\subsection{Paso 3: Cálculo de Conjuntos FIRST (first\_follow.py)}
+
+\subsubsection{Función compute\_first\_sets(grammar)}
+
+\textbf{Inicialización:}
+
+\begin{verbatim}
+# Paso 1: FIRST de terminales
+FIRST(a) = {a}
+FIRST(b) = {b}
+FIRST(c) = {c}
+FIRST(d) = {d}
+FIRST(epsilon) = {epsilon}
+FIRST($) = {$}
+
+# Paso 2: FIRST de no terminales (vacíos al inicio)
+FIRST(S) = {}
+FIRST(A) = {}
+FIRST(B) = {}
+\end{verbatim}
+
+\textbf{Iteración 1:}
+
+\begin{verbatim}
+Procesando: S -> AB
+  RHS = [A, B]
+  compute_first_of_string([A, B], first_sets):
+    - FIRST(A) está vacío aún, pero A es el primero
+    - result = {} (todavía)
+  FIRST(S) = {} (sin cambios)
+
+Procesando: A -> aA
+  RHS = [a, A]
+  compute_first_of_string([a, A], first_sets):
+    - Primer símbolo es 'a' (terminal)
+    - FIRST(a) = {a}
+    - 'a' no es epsilon, así que paramos
+    - result = {a}
+  FIRST(A) = {} U {a} = {a}  
+
+Procesando: A -> d
+  RHS = [d]
+  compute_first_of_string([d], first_sets):
+    - result = {d}
+  FIRST(A) = {a} U {d} = {a, d}  
+
+Procesando: B -> bBc
+  RHS = [b, B, c]
+  compute_first_of_string([b, B, c], first_sets):
+    - Primer símbolo es 'b' (terminal)
+    - result = {b}
+  FIRST(B) = {} U {b} = {b}  
+
+Procesando: B -> e (epsilon)
+  RHS = [epsilon]
+  compute_first_of_string([epsilon], first_sets):
+    - result = {epsilon}
+  FIRST(B) = {b} U {epsilon} = {b, epsilon}  
+\end{verbatim}
+
+Hubo cambios, así que continuamos...
+
+\textbf{Iteración 2:}
+
+\begin{verbatim}
+Procesando: S -> AB
+  RHS = [A, B]
+  compute_first_of_string([A, B], first_sets):
+    - FIRST(A) = {a, d}
+    - Agregamos {a, d} - {epsilon} = {a, d}
+    - epsilon in FIRST(A)? NO
+    - Paramos (no seguimos a B)
+    - result = {a, d}
+  FIRST(S) = {} U {a, d} = {a, d}  
+
+Procesando: A -> aA (sin cambios)
+Procesando: A -> d (sin cambios)
+Procesando: B -> bBc (sin cambios)
+Procesando: B -> e (sin cambios)
+\end{verbatim}
+
+Hubo cambios, seguimos...
+
+\textbf{Iteración 3:}
+
+\begin{verbatim}
+Procesando todas las producciones: sin cambios
+\end{verbatim}
+
+¡Convergencia! El algoritmo termina.
+
+\textbf{Resultado Final:}
+
+\begin{verbatim}
+FIRST(S) = {a, d}
+FIRST(A) = {a, d}
+FIRST(B) = {b, epsilon}
+FIRST(a) = {a}
+FIRST(b) = {b}
+FIRST(c) = {c}
+FIRST(d) = {d}
+\end{verbatim}
+
+\subsection{Paso 4: Cálculo de Conjuntos FOLLOW (first\_follow.py)}
+
+\subsubsection{Función compute\_follow\_sets(grammar, first\_sets)}
+
+\textbf{Inicialización:}
+
+\begin{verbatim}
+FOLLOW(S) = {}
+FOLLOW(A) = {}
+FOLLOW(B) = {}
+
+# Agregar $ al símbolo inicial
+FOLLOW(S) = {$}
+\end{verbatim}
+
+\textbf{Iteración 1:}
+
+\begin{verbatim}
+Procesando: S -> AB
+  Para cada símbolo en RHS:
+
+  Posición 0: símbolo = A
+    beta = [B] (lo que sigue)
+    FIRST(beta) = FIRST([B]) = FIRST(B) = {b, epsilon}
+
+    Agregar FIRST(beta) - {epsilon} a FOLLOW(A):
+    FOLLOW(A) = {} U {b} = {b}  
+
+    epsilon in FIRST(beta)? SÍ
+    Agregar FOLLOW(S) a FOLLOW(A):
+    FOLLOW(A) = {b} U {$} = {b, $}  
+
+  Posición 1: símbolo = B
+    beta = [] (vacío, está al final)
+    FIRST(beta) = {epsilon}
+
+    FOLLOW(B) = {} U ({epsilon} - {epsilon}) = {}
+
+    beta está vacío, agregar FOLLOW(S):
+    FOLLOW(B) = {} U {$} = {$}  
+
+Procesando: A -> aA
+  Posición 0: símbolo = a (terminal, saltamos)
+
+  Posición 1: símbolo = A
+    beta = [] (vacío)
+
+    Agregar FOLLOW(A) a FOLLOW(A):
+    FOLLOW(A) = {b, $} U {b, $} = {b, $} (sin cambios)
+
+Procesando: A -> d
+  Posición 0: símbolo = d (terminal, saltamos)
+
+Procesando: B -> bBc
+  Posición 0: símbolo = b (terminal, saltamos)
+
+  Posición 1: símbolo = B
+    beta = [c]
+    FIRST(beta) = FIRST(c) = {c}
+
+    Agregar {c} - {epsilon} a FOLLOW(B):
+    FOLLOW(B) = {$} U {c} = {$, c}  
+
+    epsilon in FIRST(beta)? NO, no agregamos FOLLOW(B)
+
+  Posición 2: símbolo = c (terminal, saltamos)
+
+Procesando: B -> e (epsilon)
+  RHS solo tiene epsilon, saltamos
+\end{verbatim}
+
+Hubo cambios, continuamos...
+
+\textbf{Iteración 2:}
+
+\begin{verbatim}
+Procesando todas las producciones: sin cambios
+\end{verbatim}
+
+¡Convergencia!
+
+\textbf{Resultado Final:}
+
+\begin{verbatim}
+FOLLOW(S) = {$}
+FOLLOW(A) = {b, $}
+FOLLOW(B) = {c, $}
+\end{verbatim}
+
+\subsection{Paso 5: Construcción del Parser LL(1) (ll1.py)}
+
+\subsubsection{Función \_build\_table()}
+
+Ahora construimos la tabla de análisis sintáctico M[A, a]:
+
+\begin{verbatim}
+Procesando: S -> AB
+  RHS = [A, B]
+  FIRST([A, B]) = FIRST(A) = {a, d}
+
+  Para cada símbolo en FIRST - {epsilon}:
+    M[S, a] = S -> AB  
+    M[S, d] = S -> AB  
+
+  epsilon in FIRST([A, B])? NO
+
+Procesando: A -> aA
+  RHS = [a, A]
+  FIRST([a, A]) = {a}
+
+  M[A, a] = A -> aA  
+
+  epsilon in FIRST? NO
+
+Procesando: A -> d
+  RHS = [d]
+  FIRST([d]) = {d}
+
+  M[A, d] = A -> d  
+
+  epsilon in FIRST? NO
+
+Procesando: B -> bBc
+  RHS = [b, B, c]
+  FIRST([b, B, c]) = {b}
+
+  M[B, b] = B -> bBc  
+
+  epsilon in FIRST? NO
+
+Procesando: B -> e (epsilon)
+  RHS = [epsilon]
+  FIRST([epsilon]) = {epsilon}
+
+  FIRST no tiene terminales (solo epsilon)
+
+  epsilon in FIRST? SÍ
+  Para cada símbolo en FOLLOW(B) = {c, $}:
+    M[B, c] = B -> e  
+    M[B, $] = B -> e  
+\end{verbatim}
+
+\textbf{Tabla LL(1) Completa:}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{|c|c|c|c|c|c|}
+\hline
+\textbf{No Terminal} & \textbf{a} & \textbf{b} & \textbf{c} & \textbf{d} & \textbf{\$} \\
+\hline
+S & S$\rightarrow$AB & - & - & S$\rightarrow$AB & - \\
+\hline
+A & A$\rightarrow$aA & - & - & A$\rightarrow$d & - \\
+\hline
+B & - & B$\rightarrow$bBc & B$\rightarrow$e & - & B$\rightarrow$e \\
+\hline
+\end{tabular}
+\caption{Tabla LL(1) construida}
+\end{table}
+
+\textbf{¿Hay conflictos?} NO. Cada celda tiene máximo una producción.
+
+\textbf{Conclusión:} La gramática ES LL(1) 
+
+\subsection{Paso 6: Construcción del Parser SLR(1) (slr1.py)}
+
+\subsubsection{Gramática Aumentada}
+
+Primero creamos la gramática aumentada:
+
+\begin{verbatim}
+S' -> S
+S -> AB
+A -> aA | d
+B -> bBc | e
+\end{verbatim}
+
+\subsubsection{Construcción del Autómata LR(0)}
+
+\textbf{Estado 0: CLOSURE(\{[S' $\rightarrow$ $\bullet$ S]\})}
+
+\begin{verbatim}
+Items iniciales:
+  [S' -> • S]
+
+Aplicar CLOSURE:
+  [S' -> • S] tiene S después del punto
+  Agregar producciones de S:
+    [S -> • AB]
+
+  [S -> • AB] tiene A después del punto
+  Agregar producciones de A:
+    [A -> • aA]
+    [A -> • d]
+
+Estado 0 = {
+  [S' -> • S],
+  [S -> • AB],
+  [A -> • aA],
+  [A -> • d]
+}
+\end{verbatim}
+
+\textbf{Transiciones desde Estado 0:}
+
+\begin{verbatim}
+GOTO(0, S):
+  Items con S después del punto: [S' -> • S]
+  Mover punto: [S' -> S •]
+  CLOSURE([S' -> S •]) = {[S' -> S •]}
+
+  Estado 1 = {[S' -> S •]}
+
+GOTO(0, A):
+  Items con A después del punto: [S -> • AB]
+  Mover punto: [S -> A • B]
+  CLOSURE:
+    [S -> A • B] tiene B después del punto
+    Agregar: [B -> • bBc], [B -> • e]
+
+  Estado 2 = {
+    [S -> A • B],
+    [B -> • bBc],
+    [B -> • e]
+  }
+
+GOTO(0, a):
+  Items: [A -> • aA]
+  Mover: [A -> a • A]
+  CLOSURE:
+    Agregar: [A -> • aA], [A -> • d]
+
+  Estado 3 = {
+    [A -> a • A],
+    [A -> • aA],
+    [A -> • d]
+  }
+
+GOTO(0, d):
+  Items: [A -> • d]
+  Mover: [A -> d •]
+
+  Estado 4 = {[A -> d •]}
+\end{verbatim}
+
+\textbf{Continuamos desde Estado 2:}
+
+\begin{verbatim}
+GOTO(2, B):
+  Items: [S -> A • B]
+  Mover: [S -> AB •]
+
+  Estado 5 = {[S -> AB •]}
+
+GOTO(2, b):
+  Items: [B -> • bBc]
+  Mover: [B -> b • Bc]
+  CLOSURE:
+    Agregar: [B -> • bBc], [B -> • e]
+
+  Estado 6 = {
+    [B -> b • Bc],
+    [B -> • bBc],
+    [B -> • e]
+  }
+\end{verbatim}
+
+\textbf{Continuamos desde Estado 3:}
+
+\begin{verbatim}
+GOTO(3, A):
+  Items: [A -> a • A]
+  Mover: [A -> aA •]
+
+  Estado 7 = {[A -> aA •]}
+
+GOTO(3, a): va al Estado 3 (mismo estado)
+GOTO(3, d): va al Estado 4
+\end{verbatim}
+
+\textbf{Continuamos desde Estado 6:}
+
+\begin{verbatim}
+GOTO(6, B):
+  Items: [B -> b • Bc]
+  Mover: [B -> bB • c]
+
+  Estado 8 = {[B -> bB • c]}
+
+GOTO(6, b): va al Estado 6 (mismo)
+
+GOTO(6, c):
+  Items: [B -> bB • c]
+  (esto se hace desde Estado 8)
+\end{verbatim}
+
+\textbf{Desde Estado 8:}
+
+\begin{verbatim}
+GOTO(8, c):
+  Items: [B -> bB • c]
+  Mover: [B -> bBc •]
+
+  Estado 9 = {[B -> bBc •]}
+\end{verbatim}
+
+\textbf{Autómata LR(0) Completo:}
+
+\begin{verbatim}
+Estados: 0, 1, 2, 3, 4, 5, 6, 7, 8, 9
+
+Transiciones:
+  (0, S) -> 1
+  (0, A) -> 2
+  (0, a) -> 3
+  (0, d) -> 4
+  (2, B) -> 5
+  (2, b) -> 6
+  (3, A) -> 7
+  (3, a) -> 3
+  (3, d) -> 4
+  (6, B) -> 8
+  (6, b) -> 6
+  (8, c) -> 9
+\end{verbatim}
+
+\subsubsection{Construcción de Tablas ACTION y GOTO}
+
+\textbf{Tabla ACTION:}
+
+\begin{verbatim}
+Estado 0:
+  [A -> • aA]: shift en 'a' -> ACTION[0, a] = shift 3
+  [A -> • d]: shift en 'd' -> ACTION[0, d] = shift 4
+
+Estado 1:
+  [S' -> S •]: accept -> ACTION[1, $] = accept
+
+Estado 2:
+  [B -> • bBc]: shift en 'b' -> ACTION[2, b] = shift 6
+
+Estado 3:
+  [A -> • aA]: shift en 'a' -> ACTION[3, a] = shift 3
+  [A -> • d]: shift en 'd' -> ACTION[3, d] = shift 4
+
+Estado 4:
+  [A -> d •]: reduce A->d en FOLLOW(A) = {b, $}
+  ACTION[4, b] = reduce A->d
+  ACTION[4, $] = reduce A->d
+
+Estado 5:
+  [S -> AB •]: reduce S->AB en FOLLOW(S) = {$}
+  ACTION[5, $] = reduce S->AB
+
+Estado 6:
+  [B -> • bBc]: shift en 'b' -> ACTION[6, b] = shift 6
+
+Estado 7:
+  [A -> aA •]: reduce A->aA en FOLLOW(A) = {b, $}
+  ACTION[7, b] = reduce A->aA
+  ACTION[7, $] = reduce A->aA
+
+Estado 8:
+  [B -> bB • c]: shift en 'c' -> ACTION[8, c] = shift 9
+
+Estado 9:
+  [B -> bBc •]: reduce B->bBc en FOLLOW(B) = {c, $}
+  ACTION[9, c] = reduce B->bBc
+  ACTION[9, $] = reduce B->bBc
+\end{verbatim}
+
+\textbf{Tabla GOTO:}
+
+\begin{verbatim}
+GOTO[0, S] = 1
+GOTO[0, A] = 2
+GOTO[2, B] = 5
+GOTO[3, A] = 7
+GOTO[6, B] = 8
+\end{verbatim}
+
+\textbf{¿Hay conflictos?} NO. Cada celda tiene solo una acción.
+
+\textbf{Conclusión:} La gramática ES SLR(1) 
+
+\subsection{Paso 7: Decisión del Programa (cli.py)}
+
+\begin{verbatim}
+ll1_parser = LL1Parser(...)  # ÉXITO
+slr1_parser = SLR1Parser(...) # ÉXITO
+
+# Ambos parsers se construyeron exitosamente
+if ll1_parser and slr1_parser:
+    interactive_mode(ll1_parser, slr1_parser)
+\end{verbatim}
+
+El programa entra en modo interactivo y espera que el usuario elija:
+\begin{itemize}
+    \item \texttt{T} o \texttt{t}: Usar LL(1)
+    \item \texttt{B} o \texttt{b}: Usar SLR(1)
+    \item \texttt{Q} o \texttt{q}: Salir
+\end{itemize}
+
+Supongamos que el usuario elige \texttt{T} (LL(1)).
+
+\subsection{Paso 8: Parsing de la Cadena ``adbc'' con LL(1)}
+
+\subsubsection{Inicialización}
+
+\begin{verbatim}
+input_string = "adbc"
+input_symbols = [a, d, b, c, $]
+stack = [$, S]
+input_idx = 0
+\end{verbatim}
+
+\subsubsection{Traza de Ejecución}
+
+\textbf{Paso 1:}
+
+\begin{verbatim}
+Stack: [$, S]
+Input: adbc$
+input_idx: 0 (apuntando a 'a')
+
+top = S (no terminal)
+current = a
+
+Buscar M[S, a] = S -> AB
+Pop S
+Push B, A (en orden inverso)
+
+Stack: [$, B, A]
+\end{verbatim}
+
+\textbf{Paso 2:}
+
+\begin{verbatim}
+Stack: [$, B, A]
+Input: adbc$
+input_idx: 0 (apuntando a 'a')
+
+top = A (no terminal)
+current = a
+
+Buscar M[A, a] = A -> aA
+Pop A
+Push A, a (en orden inverso)
+
+Stack: [$, B, A, a]
+\end{verbatim}
+
+\textbf{Paso 3:}
+
+\begin{verbatim}
+Stack: [$, B, A, a]
+Input: adbc$
+input_idx: 0 (apuntando a 'a')
+
+top = a (terminal)
+current = a
+
+¡Coinciden! Pop a, avanzar input
+input_idx = 1
+
+Stack: [$, B, A]
+\end{verbatim}
+
+\textbf{Paso 4:}
+
+\begin{verbatim}
+Stack: [$, B, A]
+Input: dbc$
+input_idx: 1 (apuntando a 'd')
+
+top = A (no terminal)
+current = d
+
+Buscar M[A, d] = A -> d
+Pop A
+Push d
+
+Stack: [$, B, d]
+\end{verbatim}
+
+\textbf{Paso 5:}
+
+\begin{verbatim}
+Stack: [$, B, d]
+Input: dbc$
+input_idx: 1 (apuntando a 'd')
+
+top = d (terminal)
+current = d
+
+¡Coinciden! Pop d, avanzar input
+input_idx = 2
+
+Stack: [$, B]
+\end{verbatim}
+
+\textbf{Paso 6:}
+
+\begin{verbatim}
+Stack: [$, B]
+Input: bc$
+input_idx: 2 (apuntando a 'b')
+
+top = B (no terminal)
+current = b
+
+Buscar M[B, b] = B -> bBc
+Pop B
+Push c, B, b (en orden inverso)
+
+Stack: [$, c, B, b]
+\end{verbatim}
+
+\textbf{Paso 7:}
+
+\begin{verbatim}
+Stack: [$, c, B, b]
+Input: bc$
+input_idx: 2 (apuntando a 'b')
+
+top = b (terminal)
+current = b
+
+¡Coinciden! Pop b, avanzar input
+input_idx = 3
+
+Stack: [$, c, B]
+\end{verbatim}
+
+\textbf{Paso 8:}
+
+\begin{verbatim}
+Stack: [$, c, B]
+Input: c$
+input_idx: 3 (apuntando a 'c')
+
+top = B (no terminal)
+current = c
+
+Buscar M[B, c] = B -> e (epsilon)
+Pop B
+Push epsilon (pero epsilon se ignora)
+
+Stack: [$, c]
+\end{verbatim}
+
+\textbf{Paso 9:}
+
+\begin{verbatim}
+Stack: [$, c]
+Input: c$
+input_idx: 3 (apuntando a 'c')
+
+top = c (terminal)
+current = c
+
+¡Coinciden! Pop c, avanzar input
+input_idx = 4
+
+Stack: [$]
+\end{verbatim}
+
+\textbf{Paso 10:}
+
+\begin{verbatim}
+Stack: [$]
+Input: $
+input_idx: 4 (apuntando a '$')
+
+top = $ (end marker)
+current = $
+
+¡Coinciden! Pop $, avanzar input
+input_idx = 5
+
+Stack: []
+\end{verbatim}
+
+\textbf{Resultado:}
+
+\begin{verbatim}
+Stack vacío y entrada consumida completamente
+¡ACEPTAR! 
+
+El programa imprime: "yes"
+\end{verbatim}
+
+\subsection{Resumen de la Traza Completa}
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{|c|l|l|l|l|}
+\hline
+\textbf{Paso} & \textbf{Pila} & \textbf{Entrada} & \textbf{Acción} & \textbf{Producción} \\
+\hline
+1 & [\$, S] & adbc\$ & expand & S$\rightarrow$AB \\
+2 & [\$, B, A] & adbc\$ & expand & A$\rightarrow$aA \\
+3 & [\$, B, A, a] & adbc\$ & match & - \\
+4 & [\$, B, A] & dbc\$ & expand & A$\rightarrow$d \\
+5 & [\$, B, d] & dbc\$ & match & - \\
+6 & [\$, B] & bc\$ & expand & B$\rightarrow$bBc \\
+7 & [\$, c, B, b] & bc\$ & match & - \\
+8 & [\$, c, B] & c\$ & expand & B$\rightarrow$e \\
+9 & [\$, c] & c\$ & match & - \\
+10 & [\$] & \$ & match & - \\
+11 & [] & - & \textbf{ACCEPT} & - \\
+\hline
+\end{tabular}
+\caption{Traza completa del parsing LL(1) para ``adbc''}
+\end{table}
+
+\subsection{Árbol de Derivación}
+
+El proceso de parsing construye implícitamente este árbol de derivación:
+
+\begin{verbatim}
+              S
+             / \
+            A   B
+           / \   \
+          a   A   e
+              |
+              d
+\end{verbatim}
+
+Que se puede leer como:
+\begin{itemize}
+    \item S deriva AB
+    \item A deriva aA, que deriva ad
+    \item B deriva e (epsilon)
+    \item Resultado final: a + d + (nada) = \texttt{ad}
+\end{itemize}
+
+Pero espera... ¿dónde están la 'b' y la 'c'?
+
+\textbf{¡Error de análisis!} Revisemos...
+
+Ah, en el paso 6 expandimos B $\rightarrow$ bBc, lo que agrega 'b' y 'c' como terminales a verificar. Entonces:
+
+\begin{verbatim}
+              S
+             / \
+            A   B
+           / \ / | \
+          a   A b B c
+              |   |
+              d   e
+\end{verbatim}
+
+Cadena generada: a + d + b + (nada) + c = \texttt{adbc} 
+
+\subsection{Puntos Clave del Ejemplo}
+
+\begin{enumerate}
+    \item \textbf{Epsilon es especial}: La producción B $\rightarrow$ e (epsilon) no agrega nada a la cadena, pero es importante para el análisis.
+
+    \item \textbf{FOLLOW es crucial}: Sin FOLLOW, no sabríamos cuándo usar B $\rightarrow$ e. El símbolo 'c' en el input está en FOLLOW(B), por eso sabemos que podemos reducir B a epsilon.
+
+    \item \textbf{La pila trabaja al revés}: Cuando expandimos una producción, ponemos el lado derecho en orden inverso en la pila para que el primer símbolo quede arriba.
+
+    \item \textbf{LL(1) es predictivo}: En cada paso sabemos exactamente qué hacer solo mirando el tope de la pila y el siguiente símbolo de entrada. No hay que retroceder ni probar opciones.
+
+    \item \textbf{La gramática acepta múltiples cadenas}: Por ejemplo, también aceptaría:
+    \begin{itemize}
+        \item ``d'' (A$\rightarrow$d, B$\rightarrow$e)
+        \item ``aaadbc'' (A$\rightarrow$aA múltiples veces)
+        \item ``dbbcc'' (A$\rightarrow$d, B$\rightarrow$bBc con B$\rightarrow$bBc dentro)
+    \end{itemize}
+\end{enumerate}
+
+\subsection{Comparación: ¿Cómo sería con SLR(1)?}
+
+Si hubiéramos elegido el parser SLR(1), el proceso sería diferente:
+
+\begin{itemize}
+    \item \textbf{Bottom-up}: Empezaríamos leyendo símbolos y haciendo \textit{shift}
+    \item \textbf{Reduce}: Cuando reconocemos el lado derecho de una producción, lo reducimos
+    \item \textbf{Estados}: Usamos una pila de estados en vez de símbolos de gramática
+    \item \textbf{Resultado}: El mismo, pero el camino es opuesto
+\end{itemize}
+
+LL(1) construye el árbol de arriba hacia abajo (de la raíz a las hojas).
+SLR(1) construye el árbol de abajo hacia arriba (de las hojas a la raíz).
+
+\subsection{Conclusión del Walkthrough}
+
+Este ejemplo muestra cómo el programa:
+\begin{enumerate}
+    \item Lee y parsea la entrada
+    \item Construye estructuras de datos (Grammar, Symbol, Production)
+    \item Calcula conjuntos FIRST y FOLLOW mediante iteración de punto fijo
+    \item Construye las tablas de parsing (LL(1) y SLR(1))
+    \item Valida cadenas de entrada paso a paso
+\end{enumerate}
+
+Cada componente del código tiene un propósito específico y todos trabajan juntos para realizar el análisis sintáctico completo.
