@@ -1,0 +1,9 @@
+3
+S -> AB
+A -> a e
+B -> b e
+ab
+a
+b
+aa
+

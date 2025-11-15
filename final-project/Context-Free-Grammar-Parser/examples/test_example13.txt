@@ -1,0 +1,11 @@
+1
+S -> aSb b
+T
+b
+ab
+aabb
+aaabbb
+aab
+
+Q
+

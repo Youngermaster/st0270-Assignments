@@ -1,0 +1,7 @@
+1
+S -> aS e
+a
+aa
+aaa
+aaaa
+

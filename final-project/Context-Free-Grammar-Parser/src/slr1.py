@@ -54,9 +54,14 @@ class LR0Item:
         Examples:
             [A → a • B c] returns B
             [A → a b •] returns None
+            [B → • ε] returns None (epsilon production treated as complete)
         """
         if self.dot_pos < len(self.production.rhs):
-            return self.production.rhs[self.dot_pos]
+            symbol = self.production.rhs[self.dot_pos]
+            # Epsilon productions are treated as already complete
+            if symbol.is_epsilon():
+                return None
+            return symbol
         return None
 
     def __str__(self):
