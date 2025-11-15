@@ -1,0 +1,81 @@
+\section{Introducción}
+Creamos un paquete en~Python que, dado un CFG, calcula \textbf{FIRST}, \textbf{FOLLOW}, arma
+tablas \textbf{LL(1)} y \textbf{SLR(1)} y deja parsear cadenas desde la terminal.
+Todo corre con Python~3.12 y \emph{cero dependencias} externas.
+
+\section{Problemas que encontramos}
+
+\subsection{P1 -- \_\_main\_\_.py inexistente}
+\textbf{Síntoma.} \verb|python -m cfp| respondía  
+\verb|No module named cfp.__main__ ...|  
+\textbf{Qué pasaba.} El paquete no tenía punto de entrada.  
+\textbf{Arreglo.} Añadimos \texttt{cfp/\_\_main\_\_.py} con dos líneas que llaman a \texttt{cli.main()}.  
+
+%------------------------------------------------------------
+
+\subsection{P2 -- Ejecutar el script sin usar el paquete y los imports relativos}
+\textbf{Síntoma.} \verb|python cfp/cli.py| lanzaba  
+\verb|ImportError: attempted relative import with no known parent package|.  
+\textbf{Qué pasaba.} Cuando se corre un archivo dentro de un paquete
+directamente, Python ya no ve la carpeta como un paquete y los imports
+\verb|from .grammar ...| fallan.  
+\textbf{Arreglo.} Decidimos estandarizar el comando a  
+\verb|python -m cfp.cli| (o simplemente \verb|python -m cfp| después de P1).  
+
+%------------------------------------------------------------
+
+\subsection{P3 -- El flag \texttt{changed} mataba nuestro \textbf{FIRST}}
+\textbf{Historia rápida.}
+Con la gramática de prueba  
+\verb|S -> S+T T|, \verb|T -> T*F F|, \verb|F -> (S) i|  
+el programa decía que la gramática era \emph{también} LL(1).  
+\textbf{Causa raíz.} En el bucle que propaga FIRST, actualizábamos el flag
+\verb|changed| \emph{después} de hacer \verb|break|, así que el algoritmo creía
+que todo estaba estable y paraba antes de llenar \texttt{FIRST(S)}.  
+\textbf{Fix.} Mover la línea que compara tamaños justo antes del \verb|break|:
+
+\begin{verbatim}
+first[A] |= first[sym] - {"e"}
+if len(first[A]) != before:  # ahora sí se marca el cambio
+    changed = True
+if "e" not in first[sym]:
+    break
+\end{verbatim}
+
+\textbf{Resultado.} Ahora la misma gramática se clasifica sólo como \textbf{SLR(1)}, tal como indica el enunciado.
+
+%------------------------------------------------------------
+
+\subsection{P4 -- Conflictos \emph{shift/reduce} fantasma en la tabla SLR(1)}
+\textbf{Síntoma.} Para la gramática  
+\verb|E -> E+E E*E (E) i|  
+obteníamos un traceback genérico “\verb|conflict|” sin mayor pista.  
+\textbf{Qué pasaba.} El generador de la tabla SLR(1) levantaba \texttt{ValueError}
+cuando encontraba dos acciones distintas en la misma celda, pero no decía en qué
+estado ni con qué símbolo.  
+\textbf{Solución.} Añadimos al mensaje los índices de estado y símbolo:
+
+\begin{verbatim}
+raise ValueError(f"shift/reduce conflict in state {i} on '{X}'")
+\end{verbatim}
+
+Eso hizo trivial identificar la producción culpable y, de paso, nos enseñó a
+documentar los errores del parser con \texttt{pytest --capture=no}.
+
+%------------------------------------------------------------
+
+\section{Buenas prácticas que salieron de todo esto}
+\begin{itemize}
+  \item Seis módulos chiquitos \textrightarrow\ fácil de leer y testear.
+  \item Tipado estático en la mayoría de los archivos.
+  \item Algoritmos puros: FIRST/FOLLOW no modifican \texttt{Grammar}.
+  \item \textit{Fail-fast}: lanzamos \texttt{ValueError} al detectar conflictos.
+\end{itemize}
+
+\section{Siguientes pasos o posibles mejoras}
+\begin{itemize}
+  \item Suite de tests con \texttt{pytest} y cobertura mínima del 80\%.
+  \item Exportar la colección de estados LR(0) a Graphviz para dibujar autómatas.
+  \item Publicar en PyPI (\verb|pip install cfp-parser| suena bien).
+  \item Añadir un lexer simple para manejar tokens de varias letras.
+\end{itemize}
